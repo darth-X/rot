@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# alternate screen tech
+tput smcup
+tput civis
+
+cleanup() {
+  tput cnorm
+  tput rmcup
+  clear
+}
+trap cleanup EXIT
+
+# TODO: make a config file to set a location + logic to edit it
+main_location=~/Videos
+cd ${main_location}
+
+# bs
+
+cols=$(tput cols)
+box_w=$((cols - 2))
+
+# header | maybe beautify? idk
+gum style \
+  --border rounded \
+  --border-foreground "#7c3aed" \
+  --align center \
+  --width "${box_w}" \
+  --padding "1 2" \
+  --margin "1 0" \
+  $'\e[1;38;2;224;108;117mR O T\e[0m\n\n\e[3;38;2;156;163;175mtime well spent decaying\e[0m'
+
+# TODO: add a back mech
+while true; do
+  # show selection
+  shows=()
+  for i in */; do
+    x="${i%/}"
+    x="${x//-/ }"
+    shows+=("${x}")
+  done
+
+  show=$(gum choose --header "Choose a show:" -- "${shows[@]}") || exit 0
+  cd "${show// /-}" || exit 1
+
+  # if seasons directory then handle it
+  if compgen -G "./*/" >/dev/null; then
+    # TODO: implement .last-season logic
+    seasons=()
+    for i in */; do
+      x="${i%/}"
+      x="${x//s/Season }"
+      seasons+=("${x}")
+    done
+
+    season=$(gum choose "${seasons[@]}") || exit 0
+
+    cd "${season//Season /s}"
+  fi
+
+  # final video selection
+  eps=()
+  for i in *; do
+    if [[ -f "${i}" ]]; then
+      eps+=("${i}")
+    fi
+  done
+
+  ep=""
+  if [[ ! -f "./.last-ep" ]]; then
+    touch "./.last-ep"
+    ep=$(gum choose "${eps[@]}")
+  else
+    ep=$(gum choose --selected "$(<"./.last-ep")" -- "${eps[@]}") || exit 0
+  fi
+
+  echo ${ep} >"./.last-ep"
+  gum spin -s points --title " Now playing: ${ep}" -- mpv "${ep}"
+
+  # reset
+  cd ${main_location}
+done
